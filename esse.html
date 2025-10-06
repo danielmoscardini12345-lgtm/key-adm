@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gerador de Keys - CHZIOS</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #300000, #000000);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      color: #ff3b3b;
+      text-shadow: 0 0 10px #ff0000;
+    }
+    .panel {
+      background: rgba(30, 0, 0, 0.85);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(255,0,0,0.4);
+      max-width: 400px;
+      width: 100%;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+    }
+    select {
+      background: #190000;
+      color: white;
+      border: 1px solid #400000;
+    }
+    button {
+      background: linear-gradient(90deg, #ff1e1e, #b00000);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    button:hover {
+      transform: scale(1.02);
+      box-shadow: 0 0 12px rgba(255,0,0,0.6);
+    }
+    .generated-key {
+      margin-top: 10px;
+      padding: 10px;
+      background: #1a0000;
+      border: 1px solid #400000;
+      border-radius: 8px;
+      font-family: monospace;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Gerador de Keys CHZIOS</h1>
+  <div class="panel">
+    <label for="validade">Validade (em dias):</label>
+    <select id="validade">
+      <option value="1">1 dia</option>
+      <option value="3">3 dias</option>
+      <option value="7" selected>7 dias</option>
+      <option value="15">15 dias</option>
+      <option value="30">30 dias</option>
+    </select>
+
+    <button id="gerarBtn">Gerar Key</button>
+
+    <div id="keyBox" class="generated-key" style="display:none;"></div>
+  </div>
+
+  <script>
+    const GITHUB_USER = "danielmoscardini12345";
+    const REPO = "keys-adm";
+    const FILE_PATH = "keys.json";
+    const GITHUB_TOKEN = "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"; // 👈 Cole aqui seu token completo
+
+    document.getElementById("gerarBtn").addEventListener("click", gerarKey);
+
+    async function gerarKey() {
+      const dias = parseInt(document.getElementById("validade").value);
+      const key = gerarFormatoKey(dias);
+      const expiresAt = calcularExpiracao(dias);
+
+      try {
+        // Buscar conteúdo atual do keys.json
+        const apiUrl = `https://api.github.com/repos/${GITHUB_USER}/${REPO}/contents/${FILE_PATH}`;
+        const headers = { 
+          "Authorization": `token ${GITHUB_TOKEN}`,
+          "Accept": "application/vnd.github.v3+json"
+        };
+        const response = await fetch(apiUrl, { headers });
+        const data = await response.json();
+
+        let keysArray = [];
+        let sha = null;
+
+        if (data.content) {
+          const content = atob(data.content);
+          try {
+            keysArray = JSON.parse(content);
+          } catch (e) {
+            console.error("Erro ao ler JSON existente:", e);
+            keysArray = [];
+          }
+          sha = data.sha;
+        }
+
+        // Adicionar nova key
+        keysArray.push({
+          key: key,
+          active: true,
+          expiresAt: expiresAt
+        });
+
+        // Atualizar no GitHub
+        const updatedContent = btoa(JSON.stringify(keysArray, null, 2));
+        const commitMessage = `Adicionada nova key: ${key}`;
+
+        const putResponse = await fetch(apiUrl, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({
+            message: commitMessage,
+            content: updatedContent,
+            sha: sha
+          })
+        });
+
+        if (putResponse.ok) {
+          document.getElementById("keyBox").style.display = "block";
+          document.getElementById("keyBox").textContent = key;
+        } else {
+          const err = await putResponse.json();
+          alert("Erro ao salvar no GitHub ❌");
+          console.error(err);
+        }
+
+      } catch (error) {
+        console.error(error);
+        alert("Erro de conexão com GitHub");
+      }
+    }
+
+    function gerarFormatoKey(dias) {
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+      let randomPart = "";
+      for (let i = 0; i < 6; i++) {
+        randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return `CHZIOS-${dias}D-${randomPart}`;
+    }
+
+    function calcularExpiracao(dias) {
+      const now = new Date();
+      now.setDate(now.getDate() + dias);
+      return now.toISOString();
+    }
+  </script>
+</body>
+</html>
