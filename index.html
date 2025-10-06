@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Gerador de Keys — CHZIOS</title>
+  <style>
+    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial}
+    body{background:linear-gradient(180deg,#0f172a,#071029);color:#e6eef8;margin:0;padding:24px}
+    .container{max-width:880px;margin:0 auto}
+    h1{margin:0 0 12px;font-size:28px}
+    .card{background:rgba(255,255,255,0.03);padding:14px;border-radius:10px;margin:14px 0}
+    input,select,textarea{width:100%;padding:8px;margin:6px 0;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:inherit}
+    .buttons{display:flex;gap:8px;margin-top:6px}
+    button{padding:8px 12px;border-radius:8px;border:0;background:#0ea5a1;color:#021018;cursor:pointer}
+    button.secondary{background:#94a3b8}
+    button.danger{background:#ef4444;color:white}
+    .row{display:flex;gap:8px}
+    ul#list{list-style:none;padding:0;margin:0}
+    ul#list li{padding:8px;border-radius:6px;background:rgba(255,255,255,0.02);margin:6px 0;display:flex;justify-content:space-between;align-items:center}
+    .muted{color:#9fb0c8;font-size:13px}
+    footer{color:#9fb0c8;font-size:13px;margin-top:8px}
+    small code{background:rgba(0,0,0,0.25);padding:2px 6px;border-radius:4px}
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Gerador de Keys</h1>
+  <p>Gere, gerencie e baixe um arquivo <code>keys.json</code> pronto para usar no Scriptable ou hospedar no GitHub.</p>
+
+  <div class="card">
+    <label>Prefixo opcional (ex: CHZ-)</label>
+    <input id="prefix" placeholder="Prefixo da key (opcional)"/>
+    <label>Validade (YYYY-MM-DD)</label>
+    <input id="validade" type="date"/>
+    <label>Status</label>
+    <select id="status">
+      <option value="ativa">ativa</option>
+      <option value="expirada">expirada</option>
+      <option value="desativada">desativada</option>
+    </select>
+    <div class="buttons">
+      <button id="gerar">Gerar key</button>
+      <button id="importar">Importar keys.json</button>
+      <button id="baixar" class="secondary">Baixar keys.json</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Keys geradas</h2>
+    <p class="muted">Clique em uma key para copiá-la. Use os botões para remover.</p>
+    <ul id="list"></ul>
+  </div>
+
+  <div class="card">
+    <h2>JSON (pronto para hospedar - RAW)</h2>
+    <textarea id="jsonout" rows="10" readonly></textarea>
+    <div class="row">
+      <button id="copiar">Copiar JSON</button>
+      <button id="reset" class="danger">Limpar tudo</button>
+    </div>
+  </div>
+
+  <footer>
+    <small>Para hospedar no GitHub: crie um repositório público e coloque o arquivo <code>keys.json</code> no branch <code>main</code>. Use a URL RAW para o Scriptable.</small>
+  </footer>
+</div>
+
+<script>
+  const listEl = document.getElementById('list');
+  const jsonout = document.getElementById('jsonout');
+  let keys = [];
+
+  function uuid() {
+    if (crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+  function refreshUI(){
+    listEl.innerHTML = '';
+    keys.forEach((k, idx) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<div>
+        <strong>${k.key}</strong><br/><small>${k.status} • validade: ${k.validade || 'sem'} </small>
+      </div>
+      <div>
+        <button data-idx="${idx}" class="copiar">Copiar</button>
+        <button data-idx="${idx}" class="remover">Remover</button>
+      </div>`;
+      listEl.appendChild(li);
+    });
+    jsonout.value = JSON.stringify(keys, null, 2);
+  }
+
+  document.getElementById('gerar').addEventListener('click', () => {
+    const prefix = document.getElementById('prefix').value || '';
+    const validade = document.getElementById('validade').value || '';
+    const status = document.getElementById('status').value || 'ativa';
+    const newKey = prefix + uuid();
+    keys.push({ key: newKey, status, validade });
+    refreshUI();
+  });
+
+  listEl.addEventListener('click', (ev) => {
+    const btn = ev.target;
+    if (btn.classList.contains('copiar')) {
+      const idx = Number(btn.dataset.idx);
+      navigator.clipboard.writeText(keys[idx].key);
+      btn.textContent = 'Copiado';
+      setTimeout(()=>btn.textContent='Copiar',900);
+    } else if (btn.classList.contains('remover')) {
+      const idx = Number(btn.dataset.idx);
+      keys.splice(idx,1);
+      refreshUI();
+    }
+  });
+
+  document.getElementById('baixar').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(keys, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'keys.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('copiar').addEventListener('click', () => {
+    navigator.clipboard.writeText(jsonout.value);
+    document.getElementById('copiar').textContent = 'Copiado';
+    setTimeout(()=>document.getElementById('copiar').textContent='Copiar',900);
+  });
+
+  document.getElementById('reset').addEventListener('click', () => {
+    if(confirm('Limpar todas as keys?')){ keys=[]; refreshUI(); }
+  });
+
+  document.getElementById('importar').addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type='file';
+    input.accept='application/json';
+    input.onchange = e => {
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const parsed = JSON.parse(ev.target.result);
+          if(Array.isArray(parsed)) {
+            parsed.forEach(p => {
+              if(p && p.key && !keys.find(k=>k.key===p.key)) keys.push({key:String(p.key), status: p.status||'ativa', validade: p.validade||''});
+            });
+            refreshUI();
+            alert('Arquivo importado com sucesso.');
+          } else {
+            alert('Formato inválido: esperado um array de objetos.');
+          }
+        } catch(err){
+          alert('Erro ao ler JSON: '+err.message);
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  });
+
+  refreshUI();
+</script>
+</body>
+</html>
